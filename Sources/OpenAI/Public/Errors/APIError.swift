@@ -13,6 +13,7 @@ import FoundationNetworking
 
 public enum OpenAIError: DescribedError {
     case emptyData
+    case missingCompletionMarker
     case statusError(response: HTTPURLResponse, statusCode: Int)
 }
 

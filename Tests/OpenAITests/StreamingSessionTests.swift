@@ -87,7 +87,7 @@ final class StreamingSessionTests: XCTestCase {
         )
         session.urlSession(URLSessionMock(), task: DataTaskMock(), didCompleteWithError: nil)
 
-        guard let error = completionError.get() as? StreamingError,
+        guard let error = completionError.get() as? OpenAIError,
               case .missingCompletionMarker = error else {
             return XCTFail("Expected missing completion marker error")
         }

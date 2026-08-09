@@ -62,7 +62,7 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
             if let error {
                 self.completeOnce(error)
             } else if self.requiresSemanticCompletion {
-                self.completeOnce(StreamingError.missingCompletionMarker)
+                self.completeOnce(OpenAIError.missingCompletionMarker)
             } else {
                 self.completeOnce(nil)
             }
