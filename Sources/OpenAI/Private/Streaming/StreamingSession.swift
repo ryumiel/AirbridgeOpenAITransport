@@ -23,6 +23,7 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
     private let onReceiveContent: (@Sendable (StreamingSession, ResultType) -> Void)?
     private let onProcessingError: (@Sendable (StreamingSession, Error) -> Void)?
     private let onComplete: (@Sendable (StreamingSession, Error?) -> Void)?
+    private var isComplete = false
 
     init(
         urlSessionFactory: URLSessionFactory = FoundationURLSessionFactory(),
@@ -55,12 +56,13 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
     
     func urlSession(_ session: any URLSessionProtocol, task: any URLSessionTaskProtocol, didCompleteWithError error: (any Error)?) {
         executionSerializer.dispatch {
-            self.onComplete?(self,error)
+            self.completeOnce(error)
         }
     }
     
     func urlSession(_ session: any URLSessionProtocol, dataTask: any URLSessionDataTaskProtocol, didReceive data: Data) {
         executionSerializer.dispatch {
+            guard !self.isComplete else { return }
             let data = self.middlewares.reduce(data) { current, middleware in
                 middleware.interceptStreamingData(request: dataTask.originalRequest, current)
             }
@@ -88,6 +90,16 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
 
     func urlSession(
         _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+
+    func urlSession(
+        _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
@@ -102,6 +114,17 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
         } onError: { [weak self] error in
             guard let self else { return }
             self.onProcessingError?(self, error)
+            self.completeOnce(error)
         }
+        interpreter.setCompletionCallback { [weak self] in
+            guard let self else { return }
+            self.completeOnce(nil)
+        }
+    }
+
+    private func completeOnce(_ error: Error?) {
+        guard !isComplete else { return }
+        isComplete = true
+        onComplete?(self, error)
     }
 }

@@ -18,14 +18,18 @@ final class ServerSentEventsStreamInterpreter <ResultType: Codable & Sendable>: 
     
     private var onEventDispatched: ((ResultType) -> Void)?
     private var onError: ((Error) -> Void)?
+    private var onComplete: (() -> Void)?
+    private var didComplete = false
     private let parsingOptions: ParsingOptions
+    private let strictChatCompletions: Bool
     
     enum InterpeterError: Error {
         case unhandledStreamEventType(String)
     }
     
-    init(parsingOptions: ParsingOptions) {
+    init(parsingOptions: ParsingOptions, strictChatCompletions: Bool = true) {
         self.parsingOptions = parsingOptions
+        self.strictChatCompletions = strictChatCompletions
         
         parser.setCallbackClosures { [weak self] event in
             self?.processEvent(event)
@@ -43,6 +47,10 @@ final class ServerSentEventsStreamInterpreter <ResultType: Codable & Sendable>: 
         self.onEventDispatched = onEventDispatched
         self.onError = onError
     }
+
+    func setCompletionCallback(_ onComplete: @escaping @Sendable () -> Void) {
+        self.onComplete = onComplete
+    }
     
     /// Not thread safe
     func processData(_ data: Data) {
@@ -56,10 +64,16 @@ final class ServerSentEventsStreamInterpreter <ResultType: Codable & Sendable>: 
     }
     
     private func processEvent(_ event: ServerSentEventsStreamParser.Event) {
+        guard !didComplete else { return }
         switch event.eventType {
         case "message":
             let jsonContent = event.decodedData
-            guard jsonContent != streamingCompletionMarker && !jsonContent.isEmpty else {
+            if jsonContent == streamingCompletionMarker {
+                didComplete = true
+                onComplete?()
+                return
+            }
+            guard !jsonContent.isEmpty else {
                 return
             }
             guard let jsonData = jsonContent.data(using: .utf8) else {
@@ -69,6 +83,9 @@ final class ServerSentEventsStreamInterpreter <ResultType: Codable & Sendable>: 
             
             let decoder = JSONResponseDecoder(parsingOptions: parsingOptions)
             do {
+                if strictChatCompletions, ResultType.self == ChatStreamResult.self {
+                    try StrictChatCompletionsValidator.validateStreaming(jsonData)
+                }
                 let object: ResultType = try decoder.decodeResponseData(jsonData)
                 onEventDispatched?(object)
             } catch {

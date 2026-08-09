@@ -15,8 +15,14 @@ protocol URLSessionFactory: Sendable {
 }
 
 struct FoundationURLSessionFactory: URLSessionFactory {
+    let factory: any OpenAIStreamingURLSessionFactory
+
+    init(factory: any OpenAIStreamingURLSessionFactory = OpenAISecureStreamingURLSessionFactory()) {
+        self.factory = factory
+    }
+
     func makeUrlSession(delegate: URLSessionDataDelegateProtocol) -> any URLSessionProtocol {
         let forwarder = URLSessionDataDelegateForwarder(target: delegate)
-        return URLSession(configuration: .default, delegate: forwarder, delegateQueue: nil)
+        return factory.makeURLSession(delegate: forwarder)
     }
 }

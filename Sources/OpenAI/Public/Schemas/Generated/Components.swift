@@ -4905,7 +4905,6 @@ public enum Components {
             ///
             ///
             /// - Remark: Generated from `#/components/schemas/ModelResponseProperties/user`.
-            @available(*, deprecated)
             public var user: Swift.String?
             /// A stable identifier used to help detect users of your application that may be violating OpenAI's usage policies.
             /// The IDs should be a string that uniquely identifies each user, with a maximum length of 64 characters. We recommend hashing their username or email address, in order to avoid sending us any identifying information. [Learn more](/docs/guides/safety-best-practices#safety-identifiers).
@@ -17157,4 +17156,3 @@ public enum Components {
     /// Types generated from the `#/components/headers` section of the OpenAPI document.
     public enum Headers {}
 }
-

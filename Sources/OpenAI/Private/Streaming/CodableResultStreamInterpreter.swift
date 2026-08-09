@@ -11,5 +11,10 @@ protocol StreamInterpreter: AnyObject, Sendable {
     associatedtype ResultType: Codable
     
     func setCallbackClosures(onEventDispatched: @escaping @Sendable (ResultType) -> Void, onError: @escaping @Sendable (Error) -> Void)
+    func setCompletionCallback(_ onComplete: @escaping @Sendable () -> Void)
     func processData(_ data: Data)
+}
+
+extension StreamInterpreter {
+    func setCompletionCallback(_ onComplete: @escaping @Sendable () -> Void) {}
 }

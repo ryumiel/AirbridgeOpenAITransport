@@ -46,8 +46,12 @@ final public class OpenAI: OpenAIProtocol, @unchecked Sendable {
         public let customHeaders: [String: String]
         
         public let parsingOptions: ParsingOptions
+
+        /// Rejects response fields outside Airbridge's bounded Chat Completions profile.
+        /// This affects Chat Completions only; other API surfaces retain their generated decoding behavior.
+        public let strictChatCompletions: Bool
         
-        public init(token: String?, organizationIdentifier: String? = nil, host: String = "api.openai.com", port: Int = 443, scheme: String = "https", basePath: String = "/v1", timeoutInterval: TimeInterval = 60.0, customHeaders: [String: String] = [:], parsingOptions: ParsingOptions = []) {
+        public init(token: String?, organizationIdentifier: String? = nil, host: String = "api.openai.com", port: Int = 443, scheme: String = "https", basePath: String = "/v1", timeoutInterval: TimeInterval = 60.0, customHeaders: [String: String] = [:], parsingOptions: ParsingOptions = [], strictChatCompletions: Bool = true) {
             self.token = token
             self.organizationIdentifier = organizationIdentifier
             self.host = host
@@ -57,6 +61,7 @@ final public class OpenAI: OpenAIProtocol, @unchecked Sendable {
             self.timeoutInterval = timeoutInterval
             self.customHeaders = customHeaders
             self.parsingOptions = parsingOptions
+            self.strictChatCompletions = strictChatCompletions
         }
     }
     
@@ -89,13 +94,16 @@ final public class OpenAI: OpenAIProtocol, @unchecked Sendable {
     public convenience init(
         configuration: Configuration,
         session: URLSession = URLSession.shared,
+        streamingURLSessionFactory: any OpenAIStreamingURLSessionFactory = OpenAISecureStreamingURLSessionFactory(),
         middlewares: [OpenAIMiddleware] = [],
         sslStreamingDelegate: SSLDelegateProtocol? = nil
     ) {
         let streamingSessionFactory = ImplicitURLSessionStreamingSessionFactory(
             middlewares: middlewares,
             parsingOptions: configuration.parsingOptions,
-            sslDelegate: sslStreamingDelegate
+            strictChatCompletions: configuration.strictChatCompletions,
+            sslDelegate: sslStreamingDelegate,
+            urlSessionFactory: FoundationURLSessionFactory(factory: streamingURLSessionFactory)
         )
         
         self.init(
@@ -345,7 +353,7 @@ final public class OpenAI: OpenAIProtocol, @unchecked Sendable {
 }
 
 extension OpenAI {
-    func performRequest<ResultType: Codable>(
+    func performRequest<ResultType: Codable & SendableMetatype>(
         request: any URLRequestBuildable,
         completion: @escaping @Sendable (Result<ResultType, Error>) -> Void
     ) -> CancellableRequest {

@@ -192,7 +192,7 @@ extension OpenAI: OpenAIAsync {
         )
     }
     
-    func performRequestAsync<ResultType: Codable & Sendable>(request: any URLRequestBuildable) async throws -> ResultType {
+    func performRequestAsync<ResultType: Codable & Sendable & SendableMetatype>(request: any URLRequestBuildable) async throws -> ResultType {
         try await asyncClient.performRequest(request: request)
     }
     

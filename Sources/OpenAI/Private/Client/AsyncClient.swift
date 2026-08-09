@@ -31,7 +31,7 @@ actor AsyncClient {
         self.responseHandler = responseHandler
     }
     
-    func performRequest<ResultType: Codable & Sendable>(request: any URLRequestBuildable) async throws -> ResultType {
+    func performRequest<ResultType: Codable & Sendable & SendableMetatype>(request: any URLRequestBuildable) async throws -> ResultType {
         let urlRequest = try request.build(configuration: configuration)
         let interceptedRequest = middlewares.reduce(urlRequest) { current, middleware in
             middleware.intercept(request: current)
@@ -98,7 +98,7 @@ actor AsyncClient {
         }
     }
     
-    private func makeDataTask<ResultType: Codable>(
+    private func makeDataTask<ResultType: Codable & SendableMetatype>(
         forRequest request: URLRequest,
         completion: @escaping @Sendable (Result<ResultType, Error>) -> Void
     ) -> URLSessionDataTaskProtocol {

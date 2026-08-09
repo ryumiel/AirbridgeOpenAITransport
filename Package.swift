@@ -13,7 +13,8 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.8.2")
+        .package(url: "https://github.com/apple/swift-openapi-runtime", exact: "1.12.0"),
+        .package(url: "https://github.com/apple/swift-http-types", exact: "1.6.0")
     ],
     targets: [
         .target(

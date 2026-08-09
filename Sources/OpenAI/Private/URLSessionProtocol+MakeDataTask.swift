@@ -11,7 +11,7 @@ import FoundationNetworking
 #endif
 
 extension URLSessionProtocol {
-    func makeDataTask<ResultType: Codable>(
+    func makeDataTask<ResultType: Codable & SendableMetatype>(
         forRequest request: URLRequest,
         middlewares: [OpenAIMiddleware],
         completion: @escaping @Sendable (Result<ResultType, Error>) -> Void

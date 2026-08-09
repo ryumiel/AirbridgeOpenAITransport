@@ -332,7 +332,7 @@ extension ChatQuery.ChatCompletionMessageParam {
 
 extension ChatQuery.ChatCompletionMessageParam.UserMessageParam.Content {
     enum ContentDecodingError: Error {
-        case unableToDecodeNeitherOfPossibleTypes(Decoder, [Error])
+        case unableToDecodeNeitherOfPossibleTypes([Error])
     }
     
     public init(from decoder: Decoder) throws {
@@ -355,6 +355,6 @@ extension ChatQuery.ChatCompletionMessageParam.UserMessageParam.Content {
             errors.append(error)
         }
         
-        throw ContentDecodingError.unableToDecodeNeitherOfPossibleTypes(decoder, errors)
+        throw ContentDecodingError.unableToDecodeNeitherOfPossibleTypes(errors)
     }
 }

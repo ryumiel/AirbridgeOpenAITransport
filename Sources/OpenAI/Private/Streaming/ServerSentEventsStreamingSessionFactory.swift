@@ -37,7 +37,9 @@ protocol StreamingSessionFactory: Sendable {
 struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
     let middlewares: [OpenAIMiddleware]
     let parsingOptions: ParsingOptions
+    let strictChatCompletions: Bool
     let sslDelegate: SSLDelegateProtocol?
+    let urlSessionFactory: URLSessionFactory
     
     func makeServerSentEventsStreamingSession<ResultType>(
         urlRequest: URLRequest,
@@ -46,8 +48,12 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
         onComplete: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, (any Error)?) -> Void
     ) -> StreamingSession<ServerSentEventsStreamInterpreter<ResultType>> where ResultType : Decodable, ResultType : Encodable, ResultType : Sendable {
         .init(
+            urlSessionFactory: urlSessionFactory,
             urlRequest: urlRequest,
-            interpreter: .init(parsingOptions: parsingOptions),
+            interpreter: .init(
+                parsingOptions: parsingOptions,
+                strictChatCompletions: strictChatCompletions
+            ),
             sslDelegate: sslDelegate,
             middlewares: middlewares,
             onReceiveContent: onReceiveContent,
@@ -63,6 +69,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
         onComplete: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, (any Error)?) -> Void
     ) -> StreamingSession<AudioSpeechStreamInterpreter> {
         .init(
+            urlSessionFactory: urlSessionFactory,
             urlRequest: urlRequest,
             interpreter: .init(),
             sslDelegate: sslDelegate,
@@ -80,6 +87,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
         onComplete: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, (any Error)?) -> Void
     ) -> StreamingSession<ModelResponseEventsStreamInterpreter> {
         .init(
+            urlSessionFactory: urlSessionFactory,
             urlRequest: urlRequest,
             interpreter: .init(),
             sslDelegate: sslDelegate,

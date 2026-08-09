@@ -28,7 +28,7 @@ final class Client: Sendable {
         self.cancellablesFactory = cancellablesFactory
     }
     
-    func performRequest<ResultType: Codable>(request: any URLRequestBuildable, completion: @escaping @Sendable (Result<ResultType, Error>) -> Void) -> CancellableRequest {
+    func performRequest<ResultType: Codable & SendableMetatype>(request: any URLRequestBuildable, completion: @escaping @Sendable (Result<ResultType, Error>) -> Void) -> CancellableRequest {
         do {
             let urlRequest = try request.build(configuration: configuration)
             let interceptedRequest = middlewares.reduce(urlRequest) { current, middleware in

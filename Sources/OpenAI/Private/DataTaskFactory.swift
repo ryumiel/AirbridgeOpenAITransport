@@ -19,7 +19,7 @@ final class DataTaskFactory: Sendable {
         self.responseHandler = responseHandler
     }
     
-    func makeDataTask<ResultType: Codable>(forRequest request: URLRequest, completion: @escaping @Sendable (Result<ResultType, Error>) -> Void) -> URLSessionDataTaskProtocol {
+    func makeDataTask<ResultType: Codable & SendableMetatype>(forRequest request: URLRequest, completion: @escaping @Sendable (Result<ResultType, Error>) -> Void) -> URLSessionDataTaskProtocol {
         session.dataTask(with: request) { data, response, error in
             do {
                 let decoded: ResultType = try self.responseHandler.interceptAndDecode(

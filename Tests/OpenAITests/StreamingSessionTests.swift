@@ -33,6 +33,40 @@ final class StreamingSessionTests: XCTestCase {
         streamInterpreter.processData(.init())
         XCTAssertEqual(onReceivedContentCallCount, 1)
     }
+
+    func testRejectsRedirects() throws {
+        let session = URLSession(configuration: .ephemeral)
+        let originalURL = try XCTUnwrap(URL(string: "http://127.0.0.1:8080/v1/chat/completions"))
+        let redirectURL = try XCTUnwrap(URL(string: "http://127.0.0.1:8081/v1/chat/completions"))
+        let task = session.dataTask(with: originalURL)
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: originalURL,
+            statusCode: 307,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Location": redirectURL.absoluteString]
+        ))
+        let result = URLRequestBox(URLRequest(url: redirectURL))
+
+        streamingSession.urlSession(
+            session,
+            task: task,
+            willPerformHTTPRedirection: response,
+            newRequest: URLRequest(url: redirectURL)
+        ) { request in
+            result.value = request
+        }
+
+        XCTAssertNil(result.value)
+        session.invalidateAndCancel()
+    }
+}
+
+private final class URLRequestBox: @unchecked Sendable {
+    var value: URLRequest?
+
+    init(_ value: URLRequest?) {
+        self.value = value
+    }
 }
 
 class MockDataStreamInterpreter: StreamInterpreter, @unchecked Sendable {

@@ -41,6 +41,9 @@ struct URLResponseHandler {
     }
     
     private func decodeJson<ResultType: Codable>(data: Data) throws -> ResultType {
+        if configuration.strictChatCompletions, ResultType.self == ChatResult.self {
+            try StrictChatCompletionsValidator.validateNonStreaming(data)
+        }
         let jsonDecoder = JSONResponseDecoder(parsingOptions: configuration.parsingOptions)
         return try jsonDecoder.decodeResponseData(data)
     }
