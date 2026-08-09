@@ -20,6 +20,7 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
     private let sslDelegate: SSLDelegateProtocol?
     private let middlewares: [OpenAIMiddleware]
     private let executionSerializer: ExecutionSerializer
+    private let requiresSemanticCompletion: Bool
     private let onReceiveContent: (@Sendable (StreamingSession, ResultType) -> Void)?
     private let onProcessingError: (@Sendable (StreamingSession, Error) -> Void)?
     private let onComplete: (@Sendable (StreamingSession, Error?) -> Void)?
@@ -32,6 +33,7 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
         sslDelegate: SSLDelegateProtocol?,
         middlewares: [OpenAIMiddleware],
         executionSerializer: ExecutionSerializer = GCDQueueAsyncExecutionSerializer(queue: .userInitiated),
+        requiresSemanticCompletion: Bool = false,
         onReceiveContent: @escaping @Sendable (StreamingSession, ResultType) -> Void,
         onProcessingError: @escaping @Sendable (StreamingSession, Error) -> Void,
         onComplete: @escaping @Sendable (StreamingSession, Error?) -> Void
@@ -42,6 +44,7 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
         self.sslDelegate = sslDelegate
         self.middlewares = middlewares
         self.executionSerializer = executionSerializer
+        self.requiresSemanticCompletion = requiresSemanticCompletion
         self.onReceiveContent = onReceiveContent
         self.onProcessingError = onProcessingError
         self.onComplete = onComplete
@@ -56,7 +59,13 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
     
     func urlSession(_ session: any URLSessionProtocol, task: any URLSessionTaskProtocol, didCompleteWithError error: (any Error)?) {
         executionSerializer.dispatch {
-            self.completeOnce(error)
+            if let error {
+                self.completeOnce(error)
+            } else if self.requiresSemanticCompletion {
+                self.completeOnce(StreamingError.missingCompletionMarker)
+            } else {
+                self.completeOnce(nil)
+            }
         }
     }
     
@@ -78,7 +87,8 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
         completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
     ) {
         executionSerializer.dispatch {
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode >= 400 {
+            if let httpResponse = response as? HTTPURLResponse,
+               !(200...299).contains(httpResponse.statusCode) {
                 let error = OpenAIError.statusError(response: httpResponse, statusCode: httpResponse.statusCode)
                 self.onProcessingError?(self, error)
                 completionHandler(.cancel)

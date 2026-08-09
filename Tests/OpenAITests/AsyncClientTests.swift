@@ -9,9 +9,10 @@ import Testing
 import Foundation
 @testable import OpenAI
 
+@Suite(.serialized)
 struct AsyncClientTests {
     
-    private let configuration = OpenAI.Configuration(token: "")
+    private let configuration = OpenAI.Configuration(token: "", strictChatCompletions: false)
     private let mockSession = URLSessionMock()
     private let mockMiddleware = MockMiddleware()
     private let client: AsyncClient
@@ -41,5 +42,27 @@ struct AsyncClientTests {
         mockMiddleware.interceptRequestReturnValue = .init(url: interceptedURL)
         let _: AudioSpeechResult = try await client.performSpeechRequest(request: JSONRequest<AudioSpeechResult>(url: originalURL))
         #expect(mockSession.dataAsyncCalls[0].request.url == interceptedURL)
+    }
+
+    @Test func rejectsNonSuccessStatusBeforeDecodingValidBody() async throws {
+        let task = try DataTaskMock.successfulJson(with: ChatResult.mock)
+        task.response = HTTPURLResponse(
+            url: originalURL,
+            statusCode: 401,
+            httpVersion: "HTTP/1.1",
+            headerFields: nil
+        )
+        mockSession.dataTask = task
+
+        do {
+            let _: ChatResult = try await client.performRequest(
+                request: JSONRequest<ChatResult>(url: originalURL)
+            )
+            Issue.record("Expected a non-success HTTP status to fail before decoding")
+        } catch let OpenAIError.statusError(_, statusCode) {
+            #expect(statusCode == 401)
+        } catch {
+            Issue.record("Unexpected error: \(type(of: error))")
+        }
     }
 }

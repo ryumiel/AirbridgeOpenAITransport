@@ -5,6 +5,7 @@
 //  Created by Oleksii Nezhyborets on 11.03.2025.
 //
 
+import Foundation
 import XCTest
 @testable import OpenAI
 
@@ -59,6 +60,38 @@ final class StreamingSessionTests: XCTestCase {
         XCTAssertNil(result.value)
         session.invalidateAndCancel()
     }
+
+    func testServerSentEventsRejectCleanEOFWithoutDoneMarker() {
+        let interpreter = ServerSentEventsStreamInterpreter<ChatStreamResult>(
+            parsingOptions: [],
+            strictChatCompletions: false
+        )
+        let completionError = ErrorBox()
+        let session = StreamingSession(
+            urlSessionFactory: MockURLSessionFactory(),
+            urlRequest: .init(url: .init(string: "/")!),
+            interpreter: interpreter,
+            sslDelegate: nil,
+            middlewares: [],
+            executionSerializer: NoDispatchExecutionSerializer(),
+            requiresSemanticCompletion: true,
+            onReceiveContent: { _, _ in },
+            onProcessingError: { _, _ in },
+            onComplete: { _, error in completionError.set(error) }
+        )
+
+        session.urlSession(
+            URLSessionMock(),
+            dataTask: DataTaskMock(),
+            didReceive: MockServerSentEvent.chatCompletionChunk()
+        )
+        session.urlSession(URLSessionMock(), task: DataTaskMock(), didCompleteWithError: nil)
+
+        guard let error = completionError.get() as? StreamingError,
+              case .missingCompletionMarker = error else {
+            return XCTFail("Expected missing completion marker error")
+        }
+    }
 }
 
 private final class URLRequestBox: @unchecked Sendable {
@@ -66,6 +99,23 @@ private final class URLRequestBox: @unchecked Sendable {
 
     init(_ value: URLRequest?) {
         self.value = value
+    }
+}
+
+private final class ErrorBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Error?
+
+    func set(_ value: Error?) {
+        lock.lock()
+        defer { lock.unlock() }
+        self.value = value
+    }
+
+    func get() -> Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
     }
 }
 

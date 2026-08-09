@@ -56,6 +56,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
             ),
             sslDelegate: sslDelegate,
             middlewares: middlewares,
+            requiresSemanticCompletion: true,
             onReceiveContent: onReceiveContent,
             onProcessingError: onProcessingError,
             onComplete: onComplete

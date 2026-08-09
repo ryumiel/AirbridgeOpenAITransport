@@ -10,4 +10,5 @@ import Foundation
 enum StreamingError: Error {
     case unknownContent
     case emptyContent
+    case missingCompletionMarker
 }
