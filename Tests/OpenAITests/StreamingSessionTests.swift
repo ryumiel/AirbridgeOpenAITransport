@@ -99,11 +99,12 @@ final class StreamingSessionTests: XCTestCase {
         let observer = OpenAIStreamingSessionCleanupObserver { event in
             events.record(event)
         }
+        let completionRecorder = CompletionRecorder()
         weak var releasedCallbackGraph: CallbackGraph?
         let session: StreamingSession<MockDataStreamInterpreter>
 
         do {
-            let callbackGraph = CallbackGraph()
+            let callbackGraph = CallbackGraph(completionRecorder: completionRecorder)
             releasedCallbackGraph = callbackGraph
             session = StreamingSession(
                 urlSessionFactory: MockURLSessionFactory(),
@@ -119,21 +120,25 @@ final class StreamingSessionTests: XCTestCase {
             )
         }
 
-        session.urlSession(URLSessionMock(), task: DataTaskMock(), didCompleteWithError: nil)
-        serializer.runNext()
-        XCTAssertEqual(events.values, [])
-        XCTAssertNotNil(releasedCallbackGraph)
-
         let urlSession = URLSession(configuration: .ephemeral)
+        session.urlSession(URLSessionMock(), task: DataTaskMock(), didCompleteWithError: nil)
         URLSessionDataDelegateForwarder(target: session).urlSession(
             urlSession,
             didBecomeInvalidWithError: nil
         )
+
         serializer.runNext()
+        XCTAssertEqual(completionRecorder.count, 1)
+        XCTAssertEqual(events.values, [])
+        XCTAssertNotNil(releasedCallbackGraph)
+
+        serializer.runNext()
+        XCTAssertEqual(completionRecorder.count, 1)
         XCTAssertEqual(events.values, [])
         XCTAssertNil(releasedCallbackGraph)
 
         serializer.runNext()
+        XCTAssertEqual(completionRecorder.count, 1)
         XCTAssertEqual(events.values, [.postCleanup])
     }
 
@@ -187,7 +192,23 @@ private final class ErrorBox: @unchecked Sendable {
 }
 
 private final class CallbackGraph: @unchecked Sendable {
-    func recordCompletion() {}
+    private let completionRecorder: CompletionRecorder
+
+    init(completionRecorder: CompletionRecorder) {
+        self.completionRecorder = completionRecorder
+    }
+
+    func recordCompletion() {
+        completionRecorder.record()
+    }
+}
+
+private final class CompletionRecorder: @unchecked Sendable {
+    private(set) var count = 0
+
+    func record() {
+        count += 1
+    }
 }
 
 private final class CleanupEventRecorder: @unchecked Sendable {
