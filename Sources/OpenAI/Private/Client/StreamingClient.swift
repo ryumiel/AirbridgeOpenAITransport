@@ -13,6 +13,7 @@ final class StreamingClient: @unchecked Sendable {
     private let streamingSessionFactory: StreamingSessionFactory
     private let cancellablesFactory: CancellablesFactory
     private let executionSerializer: ExecutionSerializer
+    private let cleanupObserver: OpenAIStreamingSessionCleanupObserver?
     private var streamingSessions: [NSObject: InvalidatableSession] = [:]
     
     init(
@@ -20,13 +21,15 @@ final class StreamingClient: @unchecked Sendable {
         streamingSessionFactory: StreamingSessionFactory,
         middlewares: [OpenAIMiddleware],
         cancellablesFactory: CancellablesFactory,
-        executionSerializer: ExecutionSerializer
+        executionSerializer: ExecutionSerializer,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver? = nil
     ) {
         self.configuration = configuration
         self.streamingSessionFactory = streamingSessionFactory
         self.middlewares = middlewares
         self.cancellablesFactory = cancellablesFactory
         self.executionSerializer = executionSerializer
+        self.cleanupObserver = cleanupObserver
     }
     
     func performStreamingRequest<ResultType: Codable & Sendable>(
@@ -41,7 +44,8 @@ final class StreamingClient: @unchecked Sendable {
             }
 
             let session = streamingSessionFactory.makeServerSentEventsStreamingSession(
-                urlRequest: interceptedRequest
+                urlRequest: interceptedRequest,
+                cleanupObserver: cleanupObserver
             ) { _, object in
                 onResult(.success(object))
             } onProcessingError: { _, error in
@@ -54,6 +58,7 @@ final class StreamingClient: @unchecked Sendable {
             return runSession(session)
         } catch {
             completion?(error)
+            cleanupObserver?.record(.noSessionCreated)
             return NoOpCancellableRequest()
         }
     }
@@ -70,7 +75,8 @@ final class StreamingClient: @unchecked Sendable {
             }
 
             let session = streamingSessionFactory.makeAudioSpeechStreamingSession(
-                urlRequest: interceptedRequest
+                urlRequest: interceptedRequest,
+                cleanupObserver: cleanupObserver
             ) { _, object in
                 onResult(.success(object))
             } onProcessingError: { _, error in
@@ -83,6 +89,7 @@ final class StreamingClient: @unchecked Sendable {
             return runSession(session)
         } catch {
             completion?(error)
+            cleanupObserver?.record(.noSessionCreated)
             return NoOpCancellableRequest()
         }
     }
@@ -99,7 +106,8 @@ final class StreamingClient: @unchecked Sendable {
             }
 
             let session = streamingSessionFactory.makeModelResponseStreamingSession(
-                urlRequest: interceptedRequest
+                urlRequest: interceptedRequest,
+                cleanupObserver: cleanupObserver
             ) { _, object in
                 onResult(.success(object))
             } onProcessingError: { _, error in
@@ -112,6 +120,7 @@ final class StreamingClient: @unchecked Sendable {
             return runSession(session)
         } catch {
             completion?(error)
+            cleanupObserver?.record(.noSessionCreated)
             return NoOpCancellableRequest()
         }
     }

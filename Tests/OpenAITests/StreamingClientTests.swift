@@ -67,4 +67,50 @@ struct StreamingClientTests {
         
         #expect(mockSession.dataTaskCalls[0].request.url == interceptedURL)
     }
+
+    @Test func requestBuildFailureReportsNoSessionCreatedAfterCompletion() async throws {
+        let events = ClientCleanupEventRecorder()
+        let client = StreamingClient(
+            configuration: configuration,
+            streamingSessionFactory: mockSessionFactory,
+            middlewares: [mockMiddleware],
+            cancellablesFactory: MockCancellablesFactory(),
+            executionSerializer: NoDispatchExecutionSerializer(),
+            cleanupObserver: .init { event in events.record(.cleanup(event)) }
+        )
+
+        _ = client.performStreamingRequest(
+            request: ThrowingStreamingRequest(),
+            onResult: { (_: Result<ChatResult, Error>) in },
+            completion: { _ in events.record(.completion) }
+        )
+
+        #expect(events.values == [.completion, .cleanup(.noSessionCreated)])
+    }
+}
+
+private struct ThrowingStreamingRequest: URLRequestBuildable {
+    struct BuildError: Error {}
+
+    func build(
+        token: String?,
+        organizationIdentifier: String?,
+        timeoutInterval: TimeInterval,
+        customHeaders: [String: String]
+    ) throws -> URLRequest {
+        throw BuildError()
+    }
+}
+
+private final class ClientCleanupEventRecorder: @unchecked Sendable {
+    enum Value: Equatable {
+        case completion
+        case cleanup(OpenAIStreamingSessionCleanupEvent)
+    }
+
+    private(set) var values: [Value] = []
+
+    func record(_ value: Value) {
+        values.append(value)
+    }
 }

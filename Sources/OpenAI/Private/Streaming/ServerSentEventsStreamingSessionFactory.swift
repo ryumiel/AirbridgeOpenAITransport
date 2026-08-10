@@ -14,6 +14,7 @@ import FoundationNetworking
 protocol StreamingSessionFactory: Sendable {
     func makeServerSentEventsStreamingSession<ResultType: Codable & Sendable>(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, ResultType) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, Error?) -> Void
@@ -21,6 +22,7 @@ protocol StreamingSessionFactory: Sendable {
     
     func makeAudioSpeechStreamingSession(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, AudioSpeechResult) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, Error?) -> Void
@@ -28,6 +30,7 @@ protocol StreamingSessionFactory: Sendable {
     
     func makeModelResponseStreamingSession(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, ResponseStreamEvent) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, Error?) -> Void
@@ -43,6 +46,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
     
     func makeServerSentEventsStreamingSession<ResultType>(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, ResultType) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, any Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, (any Error)?) -> Void
@@ -56,6 +60,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
             ),
             sslDelegate: sslDelegate,
             middlewares: middlewares,
+            cleanupObserver: cleanupObserver,
             requiresSemanticCompletion: true,
             onReceiveContent: onReceiveContent,
             onProcessingError: onProcessingError,
@@ -65,6 +70,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
     
     func makeAudioSpeechStreamingSession(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, AudioSpeechResult) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, any Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, (any Error)?) -> Void
@@ -75,6 +81,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
             interpreter: .init(),
             sslDelegate: sslDelegate,
             middlewares: middlewares,
+            cleanupObserver: cleanupObserver,
             onReceiveContent: onReceiveContent,
             onProcessingError: onProcessingError,
             onComplete: onComplete
@@ -83,6 +90,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
     
     func makeModelResponseStreamingSession(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, ResponseStreamEvent) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, any Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, (any Error)?) -> Void
@@ -93,6 +101,7 @@ struct ImplicitURLSessionStreamingSessionFactory: StreamingSessionFactory {
             interpreter: .init(),
             sslDelegate: sslDelegate,
             middlewares: middlewares,
+            cleanupObserver: cleanupObserver,
             onReceiveContent: onReceiveContent,
             onProcessingError: onProcessingError,
             onComplete: onComplete

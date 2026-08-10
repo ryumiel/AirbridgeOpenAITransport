@@ -15,16 +15,18 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
     typealias ResultType = Interpreter.ResultType
     
     private let urlSessionFactory: URLSessionFactory
-    private let urlRequest: URLRequest
-    private let interpreter: Interpreter
-    private let sslDelegate: SSLDelegateProtocol?
-    private let middlewares: [OpenAIMiddleware]
+    private var urlRequest: URLRequest?
+    private var interpreter: Interpreter?
+    private var sslDelegate: SSLDelegateProtocol?
+    private var middlewares: [OpenAIMiddleware]?
     private let executionSerializer: ExecutionSerializer
     private let requiresSemanticCompletion: Bool
-    private let onReceiveContent: (@Sendable (StreamingSession, ResultType) -> Void)?
-    private let onProcessingError: (@Sendable (StreamingSession, Error) -> Void)?
-    private let onComplete: (@Sendable (StreamingSession, Error?) -> Void)?
+    private var onReceiveContent: (@Sendable (StreamingSession, ResultType) -> Void)?
+    private var onProcessingError: (@Sendable (StreamingSession, Error) -> Void)?
+    private var onComplete: (@Sendable (StreamingSession, Error?) -> Void)?
+    private let cleanupObserver: OpenAIStreamingSessionCleanupObserver?
     private var isComplete = false
+    private var isCleanedUp = false
 
     init(
         urlSessionFactory: URLSessionFactory = FoundationURLSessionFactory(),
@@ -33,6 +35,7 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
         sslDelegate: SSLDelegateProtocol?,
         middlewares: [OpenAIMiddleware],
         executionSerializer: ExecutionSerializer = GCDQueueAsyncExecutionSerializer(queue: .userInitiated),
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver? = nil,
         requiresSemanticCompletion: Bool = false,
         onReceiveContent: @escaping @Sendable (StreamingSession, ResultType) -> Void,
         onProcessingError: @escaping @Sendable (StreamingSession, Error) -> Void,
@@ -48,12 +51,16 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
         self.onReceiveContent = onReceiveContent
         self.onProcessingError = onProcessingError
         self.onComplete = onComplete
+        self.cleanupObserver = cleanupObserver
         super.init()
         subscribeToParser()
     }
     
     func makeSession() -> PerformableSession & InvalidatableSession {
         let urlSession = urlSessionFactory.makeUrlSession(delegate: self)
+        guard let urlRequest else {
+            fatalError("Streaming session has already completed cleanup")
+        }
         return DataTaskPerformingURLSession(urlRequest: urlRequest, urlSession: urlSession)
     }
     
@@ -68,15 +75,21 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
             }
         }
     }
+
+    func urlSession(_ session: URLSession, didBecomeInvalidWithError error: (any Error)?) {
+        executionSerializer.dispatch {
+            self.cleanupOnce()
+        }
+    }
     
     func urlSession(_ session: any URLSessionProtocol, dataTask: any URLSessionDataTaskProtocol, didReceive data: Data) {
         executionSerializer.dispatch {
             guard !self.isComplete else { return }
-            let data = self.middlewares.reduce(data) { current, middleware in
+            let data = (self.middlewares ?? []).reduce(data) { current, middleware in
                 middleware.interceptStreamingData(request: dataTask.originalRequest, current)
             }
             
-            self.interpreter.processData(data)
+            self.interpreter?.processData(data)
         }
     }
 
@@ -118,7 +131,7 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
     }
 
     private func subscribeToParser() {
-        interpreter.setCallbackClosures { [weak self] content in
+        interpreter?.setCallbackClosures { [weak self] content in
             guard let self else { return }
             self.onReceiveContent?(self, content)
         } onError: { [weak self] error in
@@ -126,7 +139,7 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
             self.onProcessingError?(self, error)
             self.completeOnce(error)
         }
-        interpreter.setCompletionCallback { [weak self] in
+        interpreter?.setCompletionCallback { [weak self] in
             guard let self else { return }
             self.completeOnce(nil)
         }
@@ -136,5 +149,23 @@ final class StreamingSession<Interpreter: StreamInterpreter>: NSObject, Identifi
         guard !isComplete else { return }
         isComplete = true
         onComplete?(self, error)
+    }
+
+    private func cleanupOnce() {
+        guard !isCleanedUp else { return }
+        isCleanedUp = true
+
+        let cleanupObserver = cleanupObserver
+        urlRequest = nil
+        interpreter = nil
+        sslDelegate = nil
+        middlewares = nil
+        onReceiveContent = nil
+        onProcessingError = nil
+        onComplete = nil
+
+        executionSerializer.dispatch {
+            cleanupObserver?.record(.postCleanup)
+        }
     }
 }

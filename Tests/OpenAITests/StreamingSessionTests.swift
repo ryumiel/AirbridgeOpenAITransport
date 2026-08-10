@@ -92,6 +92,73 @@ final class StreamingSessionTests: XCTestCase {
             return XCTFail("Expected missing completion marker error")
         }
     }
+
+    func testPostCleanupWaitsForTerminalInvalidationAndClearsCallbackGraph() {
+        let serializer = DeferredExecutionSerializer()
+        let events = CleanupEventRecorder()
+        let observer = OpenAIStreamingSessionCleanupObserver { event in
+            events.record(event)
+        }
+        weak var releasedCallbackGraph: CallbackGraph?
+        let session: StreamingSession<MockDataStreamInterpreter>
+
+        do {
+            let callbackGraph = CallbackGraph()
+            releasedCallbackGraph = callbackGraph
+            session = StreamingSession(
+                urlSessionFactory: MockURLSessionFactory(),
+                urlRequest: .init(url: .init(string: "/")!),
+                interpreter: MockDataStreamInterpreter(),
+                sslDelegate: nil,
+                middlewares: [],
+                executionSerializer: serializer,
+                cleanupObserver: observer,
+                onReceiveContent: { _, _ in },
+                onProcessingError: { _, _ in },
+                onComplete: { _, _ in callbackGraph.recordCompletion() }
+            )
+        }
+
+        session.urlSession(URLSessionMock(), task: DataTaskMock(), didCompleteWithError: nil)
+        serializer.runNext()
+        XCTAssertEqual(events.values, [])
+        XCTAssertNotNil(releasedCallbackGraph)
+
+        let urlSession = URLSession(configuration: .ephemeral)
+        URLSessionDataDelegateForwarder(target: session).urlSession(
+            urlSession,
+            didBecomeInvalidWithError: nil
+        )
+        serializer.runNext()
+        XCTAssertEqual(events.values, [])
+        XCTAssertNil(releasedCallbackGraph)
+
+        serializer.runNext()
+        XCTAssertEqual(events.values, [.postCleanup])
+    }
+
+    func testPostCleanupIsReportedExactlyOnceForRepeatedTerminalInvalidation() {
+        let events = CleanupEventRecorder()
+        let session = StreamingSession(
+            urlSessionFactory: MockURLSessionFactory(),
+            urlRequest: .init(url: .init(string: "/")!),
+            interpreter: MockDataStreamInterpreter(),
+            sslDelegate: nil,
+            middlewares: [],
+            executionSerializer: NoDispatchExecutionSerializer(),
+            cleanupObserver: .init { event in events.record(event) },
+            onReceiveContent: { _, _ in },
+            onProcessingError: { _, _ in },
+            onComplete: { _, _ in }
+        )
+
+        let urlSession = URLSession(configuration: .ephemeral)
+        let forwarder = URLSessionDataDelegateForwarder(target: session)
+        forwarder.urlSession(urlSession, didBecomeInvalidWithError: nil)
+        forwarder.urlSession(urlSession, didBecomeInvalidWithError: nil)
+
+        XCTAssertEqual(events.values, [.postCleanup])
+    }
 }
 
 private final class URLRequestBox: @unchecked Sendable {
@@ -116,6 +183,30 @@ private final class ErrorBox: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return value
+    }
+}
+
+private final class CallbackGraph: @unchecked Sendable {
+    func recordCompletion() {}
+}
+
+private final class CleanupEventRecorder: @unchecked Sendable {
+    private(set) var values: [OpenAIStreamingSessionCleanupEvent] = []
+
+    func record(_ event: OpenAIStreamingSessionCleanupEvent) {
+        values.append(event)
+    }
+}
+
+private final class DeferredExecutionSerializer: ExecutionSerializer, @unchecked Sendable {
+    private var operations: [() -> Void] = []
+
+    func dispatch(_ closure: @escaping () -> Void) {
+        operations.append(closure)
+    }
+
+    func runNext() {
+        operations.removeFirst()()
     }
 }
 

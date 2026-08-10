@@ -21,6 +21,10 @@ final class URLSessionDataDelegateForwarder: NSObject, URLSessionDataDelegate {
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
         target.urlSession(session, task: task, didCompleteWithError: error)
     }
+
+    func urlSession(_ session: URLSession, didBecomeInvalidWithError error: (any Error)?) {
+        target.urlSession(session, didBecomeInvalidWithError: error)
+    }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
         target.urlSession(session, dataTask: dataTask, didReceive: data)

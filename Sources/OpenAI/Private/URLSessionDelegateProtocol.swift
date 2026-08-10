@@ -13,6 +13,8 @@ import FoundationNetworking
 
 protocol URLSessionDelegateProtocol: Sendable { // Sendable to make a better match with URLSessionDelegate, it's sendable too
     func urlSession(_ session: URLSessionProtocol, task: URLSessionTaskProtocol, didCompleteWithError error: Error?)
+
+    func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?)
     
     func urlSession(
         _ session: URLSession,
@@ -29,6 +31,8 @@ protocol URLSessionDelegateProtocol: Sendable { // Sendable to make a better mat
 }
 
 extension URLSessionDelegateProtocol {
+    func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?) {}
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,

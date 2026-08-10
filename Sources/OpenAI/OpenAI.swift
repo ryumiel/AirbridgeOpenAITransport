@@ -96,7 +96,8 @@ final public class OpenAI: OpenAIProtocol, @unchecked Sendable {
         session: URLSession = URLSession.shared,
         streamingURLSessionFactory: any OpenAIStreamingURLSessionFactory = OpenAISecureStreamingURLSessionFactory(),
         middlewares: [OpenAIMiddleware] = [],
-        sslStreamingDelegate: SSLDelegateProtocol? = nil
+        sslStreamingDelegate: SSLDelegateProtocol? = nil,
+        streamingSessionCleanupObserver: OpenAIStreamingSessionCleanupObserver? = nil
     ) {
         let streamingSessionFactory = ImplicitURLSessionStreamingSessionFactory(
             middlewares: middlewares,
@@ -110,7 +111,8 @@ final public class OpenAI: OpenAIProtocol, @unchecked Sendable {
             configuration: configuration,
             session: session,
             streamingSessionFactory: streamingSessionFactory,
-            middlewares: middlewares
+            middlewares: middlewares,
+            streamingSessionCleanupObserver: streamingSessionCleanupObserver
         )
     }
 
@@ -120,7 +122,8 @@ final public class OpenAI: OpenAIProtocol, @unchecked Sendable {
         streamingSessionFactory: StreamingSessionFactory,
         cancellablesFactory: CancellablesFactory = DefaultCancellablesFactory(),
         executionSerializer: ExecutionSerializer = GCDQueueAsyncExecutionSerializer(queue: .userInitiated),
-        middlewares: [OpenAIMiddleware] = []
+        middlewares: [OpenAIMiddleware] = [],
+        streamingSessionCleanupObserver: OpenAIStreamingSessionCleanupObserver? = nil
     ) {
         self.configuration = configuration
         
@@ -142,7 +145,8 @@ final public class OpenAI: OpenAIProtocol, @unchecked Sendable {
             streamingSessionFactory: streamingSessionFactory,
             middlewares: middlewares,
             cancellablesFactory: cancellablesFactory,
-            executionSerializer: executionSerializer
+            executionSerializer: executionSerializer,
+            cleanupObserver: streamingSessionCleanupObserver
         )
         
         self.asyncClient = .init(

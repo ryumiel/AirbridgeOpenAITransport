@@ -18,6 +18,7 @@ class MockStreamingSessionFactory: StreamingSessionFactory, @unchecked Sendable 
     
     func makeServerSentEventsStreamingSession<ResultType>(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, ResultType) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, any Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<ServerSentEventsStreamInterpreter<ResultType>>, (any Error)?) -> Void
@@ -29,6 +30,7 @@ class MockStreamingSessionFactory: StreamingSessionFactory, @unchecked Sendable 
             sslDelegate: nil,
             middlewares: [],
             executionSerializer: executionSerializer,
+            cleanupObserver: cleanupObserver,
             onReceiveContent: onReceiveContent,
             onProcessingError: onProcessingError,
             onComplete: onComplete
@@ -37,6 +39,7 @@ class MockStreamingSessionFactory: StreamingSessionFactory, @unchecked Sendable 
     
     func makeAudioSpeechStreamingSession(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, AudioSpeechResult) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, any Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<AudioSpeechStreamInterpreter>, (any Error)?) -> Void
@@ -48,6 +51,7 @@ class MockStreamingSessionFactory: StreamingSessionFactory, @unchecked Sendable 
             sslDelegate: nil,
             middlewares: [],
             executionSerializer: executionSerializer,
+            cleanupObserver: cleanupObserver,
             onReceiveContent: onReceiveContent,
             onProcessingError: onProcessingError,
             onComplete: onComplete
@@ -56,6 +60,7 @@ class MockStreamingSessionFactory: StreamingSessionFactory, @unchecked Sendable 
     
     func makeModelResponseStreamingSession(
         urlRequest: URLRequest,
+        cleanupObserver: OpenAIStreamingSessionCleanupObserver?,
         onReceiveContent: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, ResponseStreamEvent) -> Void,
         onProcessingError: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, any Error) -> Void,
         onComplete: @Sendable @escaping (StreamingSession<ModelResponseEventsStreamInterpreter>, (any Error)?) -> Void
@@ -67,11 +72,10 @@ class MockStreamingSessionFactory: StreamingSessionFactory, @unchecked Sendable 
             sslDelegate: nil,
             middlewares: [],
             executionSerializer: executionSerializer,
+            cleanupObserver: cleanupObserver,
             onReceiveContent: onReceiveContent,
             onProcessingError: onProcessingError,
             onComplete: onComplete
         )
     }
 }
-
-
